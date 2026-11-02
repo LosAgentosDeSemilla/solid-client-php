@@ -1,109 +1,86 @@
-# Solid Client PHP
+# semilla/solid-client
 
-> Re-decentralizing the web
+Solid client for PHP 8.5: Solid-OIDC sign-in (authorization code + PKCE,
+DPoP-bound tokens, refresh, Client ID Documents), HTTP over a pod with ETag
+preconditions and N3 Patch, WebID profiles and Type Indexes — plus Community
+Solid Server's client credentials for scripts and tests.
 
-[Solid](https://solidproject.org) (derived from "**so**cial **li**nked **d**ata") is a proposed set of
-conventions and tools for building *decentralized Web applications* based on
-[Linked Data](http://www.w3.org/DesignIssues/LinkedData.html) principles.
+## Origin and licence
 
-This repository contains a PHP library for accessing data and managing permissions on data stored in a Solid Pod
-It also a contains a Symfony bundle to easily build Solid applications with the [Symfony](https://symfony.com) and [API Platform](https://api-platform.com) frameworks.
+A fork of [dunglas/solid-client-php](https://github.com/dunglas/solid-client-php)
+by Kévin Dunglas (MIT, last upstream commit `6dd077a`, "compat with latest
+versions of everything"). The licence is kept as it was — see `LICENSE`; every
+file carries the upstream copyright notice beside this fork's.
 
-Take a look at [the presentation of this library at the SymfonyLive Paris 2022 conference](https://dunglas.fr/2022/04/building-decentralized-web-apps-with-solid-and-php/).
+Reference for the fixes: [Fleetbase Solid](https://github.com/fleetbase/solid)
+(its own Solid-OIDC client) and
+[Project Meent](https://project-meent.github.io/experiment-php-solid-client/).
+
+Born in people-tracker as a Composer path package, copied into solid-contacts
+and solid-genealogy, and brought here from the three copies (family docs,
+FADR-0008 D2). Its own namespace, `Semilla\SolidClient`, names nothing of any
+application.
 
 ## Install
 
-```
-composer require dunglas/solid-client-php
+Not on Packagist; a VCS repository:
+
+```bash
+composer config repositories.solid-client vcs https://github.com/LosAgentosDeSemilla/solid-client-php.git
+composer require semilla/solid-client:dev-main
 ```
 
-If you use [Symfony](https://symfony.com) or [API Platform](https://api-platform.com),
-the bundle and the corresponding recipe will be installed automatically.
+## What changed against upstream, and why
 
-## Example
+| Upstream | Here | Why |
+|---|---|---|
+| `OidcClient extends Jumbojett\OpenIDConnectClient` | `Oidc\SolidOidcClient`, stateless: `begin()` returns the request to keep, `complete()` takes it back | jumbojett redirects with `header()` + `exit`, keeps state in `$_SESSION` and is curl-bound; none of that works inside a Symfony request |
+| dynamic client registration on every login | Client ID Document (the `client_id` is a URL) | Solid-OIDC §5; no registration, no secret, the same client every time |
+| the whole OIDC client object stored in the session | `TokenSet` / `AuthorizationRequest` as plain arrays | an object graph in the session broke on upgrades |
+| DPoP `ath` = base64url of the *hex* SHA-256 | base64url of the raw SHA-256 | RFC 9449 §4.2 |
+| ID token: HS256/384/512 accepted, `R512` typo, no claim checks | asymmetric algorithms only; `iss`, `aud`, `exp`, `iat`, `nonce` checked | HS* against a public key is algorithm confusion |
+| no state / `iss` check on the callback | `state` (constant-time) and RFC 9207 `iss` checked | CSRF and mix-up defence |
+| `SolidClient`: GET and POST | `Pod\PodClient`: GET, HEAD, PUT, PATCH (N3), DELETE, POST, containers, `Precondition` (If-Match / If-None-Match), typed failures (`NotFound`, `AccessDenied`, `PreconditionFailed`, `Conflict`) | what a pod-writing app needs; a refused write must never read as a written one |
+| EasyRdf 1.1 (`easyrdf/easyrdf`) | `sweetrdf/easyrdf` (maintained fork), behind `Rdf\RdfDocument` | PHP 8.5 |
+| `web-token/jwt-*` 3.x | `web-token/jwt-library` 4.x | PHP 8.5, Symfony 8 |
+| Symfony bundle (login form, authenticator, user provider) | no bundle; the application wires the services and owns its authenticator | GADR-0007-no-bundle-wiring-is-the-projects; the account store and the login page are the application's |
+| — | `Profile\ProfileReader::storageOf()` (pim:storage or the `Link: pim:Storage` walk-up), `TypeIndex\TypeIndexReader` | finding data through the Type Index, never by path |
+| — | `clientCredentials()` | Community Solid Server client credentials for scripts/tests |
+
+## Use
 
 ```php
-<?php
+$proofs = new DpopProofFactory($clock);
+$oidc = new SolidOidcClient($http, $proofs, new IdTokenVerifier($http, $clock), $clock);
 
-use Dunglas\PhpSolidClient\SolidClientFactory;
-use Dunglas\PhpSolidClient\OidcClient;
-use Symfony\Component\HttpClient\HttpClient;
+// 1. Redirect out — keep $request (e.g. in the session).
+$issuer = (new ProfileReader(new PodClient($http)))->read($webId)->oidcIssuers[0];
+$request = $oidc->begin($issuer, 'https://app.example/client-id.jsonld', 'https://app.example/callback');
+// redirect to $request->url
 
-$solidClientFactory = new SolidClientFactory(HttpClient::create());
+// 2. Callback — then check the WebID's profile lists $tokens->issuer (trustsIssuer()).
+$tokens = $oidc->complete($request, $_GET);
 
-// Create an anonymous Solid client
-$anonymousSolidClient = $solidClientFactory->create();
-
-// Fetch the WebID profile of a user
-$profile = $anonymousSolidClient->getProfile('https://example.com/your/webid');
-// Fetch the OIDC issuer for a user
-$oidcIssuer = $anonymousSolidClient->getOidcIssuer('https://example.com/your/webid');
-
-// Create a Solid OIDC client for this user
-$oidcClient = new OidcClient($oidcIssuer);
-// Register the OIDC client dynamically
-$oidcClient->register();
-// Authenticate the user
-$oidcClient->authenticate();
-// At this point you may want to save $oidcClient in the session
-// The user will be redirected to the OIDC server to log in
-
-// Create a Solid client generating DPoP access tokens for the logged-in user
-$loggedSolidClient = $solidClientFactory->create($oidcClient);
-
-// Create a new container
-$containerResponse = $loggedSolidClient->createContainer('https://mypod.example.com', 'blog');
-$container = $containerResponse->getContent();
-
-// Post a new note
-$apiPlatformResponse = $loggedSolidClient->post('https://mypod.example.com/blog', 'api-platform-conference', <<<TTL
-@prefix as: <http://www.w3.org/ns/activitystreams#>.
-
-<> a as:Note; as:content "Going to API Platform Conference".
-TTL
-);
-$apiPlatformCon = $apiPlatformResponse->getContent();
-
-// Fetch an existing note
-$symfonyLiveResponse = $loggedSolidClient->get('https://mypod.example.com/blog/symfony-live');
-$symfonyLive = $symfonyLiveResponse->getContent();
-
-// Logout
-$oidcClient->signOut($oidcClient->getIdToken());
+// 3. The pod, as that person.
+$pod = new PodClient($http, new DpopCredentials($tokens, $proofs));
+$doc = $pod->get($url);
+$pod->put($url, $turtle, precondition: Precondition::ifMatch($doc->etag));
 ```
 
-## Features
+Refresh with `$oidc->refresh($tokens)` before `$tokens->isExpiring($now)`.
+Community Solid Server issues a refresh token only when the person ticks
+"remember this client" at consent (`offline_access` is otherwise dropped).
 
-* Standalone PHP library
-* Symfony Bundle
-  * OAuth/OIDC authenticator
-  * Solid client as a service
+## Tests
 
-### Authentication
+```bash
+composer install
+vendor/bin/phpunit --testsuite unit
+```
 
-* Modern and Fully featured [OAuth](https://datatracker.ietf.org/doc/html/rfc6749) and [OpenID Connect](https://openid.net/connect/) client (work even without Solid, extends [`jumbojett/openid-connect-php`](https://github.com/jumbojett/OpenID-Connect-PHP))
-  * [Elliptic Curve Digital Signature Algorithm (ECDSA)](https://en.wikipedia.org/wiki/Elliptic_Curve_Digital_Signature_Algorithm) JWT/JWK keys (uses [JWT Framework](https://web-token.spomky-labs.com))
-  * [Demonstrating Proof-of-Possession at the Application Layer (DPoP)](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-dpop)
-* [Solid OIDC](https://solid.github.io/solid-oidc/primer/)
-
-### Identity
-
-* [WebID](https://www.w3.org/2005/Incubator/webid/spec/identity/)
-* [Solid WebID Profiles](https://github.com/solid/solid-spec/blob/master/solid-webid-profiles.md)
-
-### Reading and Writing Resources
-
-* [Linked Data Platform](https://www.w3.org/TR/ldp/)
-* [Solid HTTPS REST API](https://github.com/solid/solid-spec/blob/master/api-rest.md) (uses [Symfony HttpClient](https://symfony.com/doc/current/http_client.html))
-* [Solid Content Representation](https://github.com/solid/solid-spec/blob/master/content-representation.md) (delegated to [EasyRDF](https://www.easyrdf.org/))
-
-## Not Implemented Yet
-
-* [OAuth Client ID](https://solid.github.io/solid-oidc/primer/#authorization-code-pkce-flow-step-7)
-* [Solid OIDC "Request Flow"](https://solid.github.io/solid-oidc/primer/#request-flow) (currently not supported by mainstream Solid servers)
-* [Web Access Control](https://solidproject.org/TR/wac)
-* [WebSockets API](https://github.com/solid/solid-spec#websockets-api=)
-* [Social Web App Protocols](https://github.com/solid/solid-spec#social-web-app-protocols)
-* [WebID-TLS](https://github.com/solid/solid-spec#webid-tls=) (not supported anymore in web browsers)
-* Symfony Bundle
-  * Redirect after login
+`tests/Integration` run against a Community Solid Server and are skipped
+without one. They read `SOLID_BASE_URL` and the development account's
+credentials from `.env` and `.env.local` in `SOLID_CLIENT_ENV_DIR`, or in the
+working directory — an application's checkout, where `make seed` wrote them:
+the pod operations as the account's client credentials, and the full
+authorization-code sign-in through the CSS account API with a refresh.

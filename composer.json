@@ -1,53 +1,46 @@
 {
-    "name": "dunglas/solid-client-php",
-    "description": "Solid client implementation for PHP",
+    "name": "semilla/solid-client",
+    "description": "Solid client for PHP: Solid-OIDC (PKCE, DPoP), pod HTTP with ETags, WebID profiles and Type Indexes. A revived fork of dunglas/solid-client-php.",
     "type": "library",
     "license": "MIT",
-    "autoload": {
-        "psr-4": {
-            "Dunglas\\PhpSolidClient\\": "src/"
-        }
-    },
-    "autoload-dev": {
-        "psr-4": { "Dunglas\\PhpSolidClient\\Tests\\": "tests/" }
-    },
     "authors": [
         {
             "name": "Kévin Dunglas",
-            "email": "kevin@dunglas.fr"
+            "email": "kevin@dunglas.fr",
+            "role": "Original author (dunglas/solid-client-php)"
+        },
+        {
+            "name": "Los Agentos de Semilla",
+            "homepage": "https://github.com/LosAgentosDeSemilla"
         }
     ],
     "require": {
-        "php": ">=8.1",
-        "jumbojett/openid-connect-php": "^0.9.10",
-        "symfony/http-client": "^6.0",
-        "easyrdf/easyrdf": "^1.1",
-        "ml/json-ld": "^1.2",
-        "web-token/jwt-core": "^3.0",
-        "web-token/jwt-key-mgmt": "^3.0",
-        "web-token/jwt-signature": "^3.0",
-        "web-token/jwt-checker": "^3.0",
-        "web-token/jwt-signature-algorithm-hmac": "^3.0",
-        "web-token/jwt-signature-algorithm-ecdsa": "^3.0",
-        "web-token/jwt-signature-algorithm-rsa": "^3.0"
+        "php": ">=8.5",
+        "psr/clock": "^1.0",
+        "sweetrdf/easyrdf": "^1.19",
+        "symfony/http-client-contracts": "^3.5",
+        "web-token/jwt-library": "^4.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "Semilla\\SolidClient\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Semilla\\SolidClient\\Tests\\": "tests/"
+        }
     },
     "require-dev": {
-        "symfony/form": "^6.0",
-        "symfony/framework-bundle": "^6.0",
-        "symfony/http-foundation": "^6.0",
-        "symfony/validator": "^6.0",
-        "symfony/dependency-injection": "^6.0",
-        "symfony/routing": "^6.0",
-        "symfony/security-bundle": "^6.0",
-        "symfony/twig-bundle": "^6.0",
-        "symfony/debug-bundle": "^6.0",
-        "symfony/web-profiler-bundle": "^6.0",
-        "symfony/console": "^6.0",
-        "symfony/stopwatch": "^6.0",
-        "symfony/phpunit-bridge": "^6.0",
-        "symfony/browser-kit": "^6.0",
-        "symfony/css-selector": "^6.0",
-        "symfony/security-core": "^6.0",
-        "vimeo/psalm": "^5.12"
+        "phpunit/phpunit": "^13.4",
+        "symfony/clock": "^8.1",
+        "symfony/dotenv": "^8.1",
+        "symfony/http-client": "^8.1"
+    },
+    "suggest": {
+        "symfony/http-client": "The HTTP client every class here takes (contracts only are required)."
+    },
+    "config": {
+        "sort-packages": true
     }
 }
