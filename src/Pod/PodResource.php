@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Semilla\SolidClient\Pod;
 
-use Semilla\SolidClient\Rdf\RdfDocument;
+use Semilla\SolidClient\Rdf\Triples;
 
 /**
  * What a read returned. For a 304 (an `ifNoneMatch` read of an unchanged
@@ -35,9 +35,9 @@ final readonly class PodResource
         return $this->status === 304;
     }
 
-    public function rdf(): RdfDocument
+    public function rdf(): Triples
     {
-        return RdfDocument::parseTurtle($this->body, $this->url);
+        return Triples::parseTurtle($this->body, $this->url);
     }
 
     /**

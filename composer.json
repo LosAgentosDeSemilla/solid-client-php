@@ -32,6 +32,7 @@
         }
     },
     "require-dev": {
+        "phpstan/phpstan": "^2.3",
         "phpunit/phpunit": "^13.4",
         "symfony/clock": "^8.1",
         "symfony/dotenv": "^8.1",
@@ -42,5 +43,9 @@
     },
     "config": {
         "sort-packages": true
+    },
+    "scripts": {
+        "test": "phpunit --testsuite unit",
+        "analyse": "phpstan analyse --memory-limit=1G"
     }
 }
