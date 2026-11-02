@@ -47,6 +47,27 @@ composer require semilla/solid-client:dev-main
 | — | `Profile\ProfileReader::storageOf()` (pim:storage or the `Link: pim:Storage` walk-up), `TypeIndex\TypeIndexReader` | finding data through the Type Index, never by path |
 | — | `clientCredentials()` | Community Solid Server client credentials for scripts/tests |
 
+## What else is here
+
+Beside the protocol, what every application on Solid pods wrote again:
+
+- **`Rdf\RdfDocument`** with `Iri`, `Iris`, `TurtleWriter`, `MalformedDocument`
+  and the standard vocabularies in `Vocabulary\`: one document of a pod, written
+  and read through IRIs and PHP values, with its own Turtle writer (EasyRdf's
+  serialiser was most of an import's time). The application names its language
+  and its own vocabularies once, at boot:
+  `RdfDocument::speak('cs', Genealogy::class, G7::class)`.
+  The protocol documents this package reads for itself are `Rdf\Triples`.
+- **`TypeIndex\TypeIndexRegistrar`**: the application's registrations
+  (`Registration`, `Registrations`) into the public and private Type Index,
+  making and linking an index the profile does not link yet; idempotent.
+- **`Testing\FakeSolidServer`** and **`Testing\FakePod`**: an identity
+  provider that really checks PKCE and DPoP and signs its ID tokens, CSS's
+  client credentials, and an LDP pod in memory (ETags from `dc:modified`,
+  If-Match / If-None-Match, listings, ACRs, N3 Patch inserts, 401 and 403).
+  The `mock_response_factory` of an application's test container.
+
+
 ## Use
 
 ```php

@@ -39,7 +39,7 @@
         "symfony/http-client": "^8.1"
     },
     "suggest": {
-        "symfony/http-client": "The HTTP client every class here takes (contracts only are required)."
+        "symfony/http-client": "The HTTP client every class here takes (only the contracts are required), and MockResponse for the fakes in Testing\\."
     },
     "config": {
         "sort-packages": true
